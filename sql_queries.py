@@ -21,107 +21,107 @@ time_table_drop = "DROP TABLE IF EXISTS time"
 # Staging Tables:
 staging_events_table_create= ("""
     CREATE TABLE staging_events(
-    artist VARCHAR(50),
-    auth VARCHAR(10),
-    firstName VARCHAR(20),
-    gender CHAR(1), 
-    itemInSession INT,
-    lastName VARCHAR(20),
-    length Decimal,
-    level VARCHAR(10),
-    location VARCHAR(50),
-    method VARCHAR(10),
-    page VARCHAR(10),
-    registration DECIMAL,
-    sessionId INT,
-    song VARCHAR(50),
-    status INT,
-    ts INT,
-    userAgent VARCHAR(100),
-    userid INT)
+        artist VARCHAR(100),
+        auth VARCHAR(50),
+        firstName VARCHAR(50),
+        gender CHAR(1),
+        itemInSession INT,
+        lastName VARCHAR(50),
+        length FLOAT,
+        level VARCHAR(50),
+        location TEXT,
+        method VARCHAR(25),
+        page VARCHAR(35),
+        registration FLOAT,
+        sessionId INT,
+        song TEXT,
+        status INT,
+        ts INT,
+        userAgent TEXT,
+        userId INT)
 """)
 
 staging_songs_table_create = ("""
     CREATE TABLE staging_songs(
-    num_songs INT,
-    artist_id VARCHAR(20),
-    artist_latitude DECIMAL,
-    artist_longitude DECIMAL, 
-    artist_location VARCHAR(50),
-    artist_name VARCHAR(50), 
-    song_id VARCHAR(20), 
-    title VARCHAR(30), 
-    duration DECIMAL, 
-    year INT)
+        num_songs INT ,
+        artist_id VARCHAR(50),
+        artist_latitude FLOAT,
+        artist_longitude FLOAT, 
+        artist_location TEXT,
+        artist_name VARCHAR(100), 
+        song_id VARCHAR(20), 
+        title TEXT, 
+        duration FLOAT, 
+        year INT)
 """)
 
 # Final Tables:
 songplay_table_create = ("""
     CREATE TABLE songplays(
-    songplay_id BIGINT,
-    start_time TIMESTAMP,
-    user_id VARCHAR(20),
-    level VARCHAR(10),
-    song_id VARCHAR(20),
-    artist_id VARCHAR(20),
-    session_id INT,
-    location VARCHAR(50),
-    user_agent VARCHAR(20))
+        songplay_id INT IDENTITY(0,1),
+        start_time BIGINT,
+        user_id VARCHAR(20),
+        level VARCHAR(10),
+        song_id VARCHAR(20),
+        artist_id VARCHAR(20),
+        session_id INT,
+        location TEXT,
+        user_agent VARCHAR(20))
 """)
 
 user_table_create = ("""
     CREATE TABLE users(
-    user_id VARCHAR(20) PRIMARY KEY NOT NULL,
-    first_name VARCHAR(20),
-    last_name VARCHAR(20),
-    gender CHAR(1),
-    level INT
+        user_id VARCHAR(30) PRIMARY KEY NOT NULL,
+        first_name VARCHAR(50),
+        last_name VARCHAR(50),
+        gender CHAR(1),
+        level INT
     )
 """)
 
 song_table_create = ("""
     CREATE TABLE songs(
-    song_id VARCHAR(20) PRIMARY KEY,
-    title VARCHAR(50),
-    artist_id VARCHAR(20),
-    year INT,
-    duration DECIMAL)
+        song_id VARCHAR(30) PRIMARY KEY NOT NULL,
+        title VARCHAR(100),
+        artist_id VARCHAR(30),
+        year INT,
+        duration FLOAT)
 """)
 
 artist_table_create = ("""
     CREATE TABLE artists(
-    artist_id VARCHAR(20) PRIMARY KEY,
-    name VARCHAR(20),
-    location VARCHAR(50),
-    latitude DECIMAL,
-    longitude DECIMAL)
+        artist_id VARCHAR(30) PRIMARY KEY NOT NULL,
+        name VARCHAR(50),
+        location TEXT,
+        latitude FLOAT,
+        longitude FLOAT)
 """)
 
 time_table_create = ("""
     CREATE TABLE time(
-    start_time TIMESTAMP PRIMARY KEY,
-    hour INT,
-    day INT,
-    week INT, 
-    month INT,
-    year INT,
-    weekday CHAR(1)
+        start_time TIMESTAMP PRIMARY KEY NOT NULL,
+        hour INT,
+        day INT,
+        week INT, 
+        month INT,
+        year INT,
+        weekday CHAR(1)
     )
 """)
 
 
 # STAGING TABLES
 
-staging_events_copy = ("""
-COPY staging_events FROM 's3://udacity-dend/log_data'
-CREDENTIALS 'aws_iam_role={}'
+staging_events_copy = """
+COPY staging_events FROM {}
+CREDENTIALS {}
 REGION 'us-west-2'
-FORMAT AS JSON 's3://udacity-dend/log_json_path.json';
-""").format(config['S3']['LOG_DATA'], config['IAM_ROLE']['ARN'], config['S3']['LOG_JSONPATH'])
+FORMAT AS JSON {};
+""".format(config['S3']['LOG_DATA'], config['IAM_ROLE']['ARN'], config['S3']['LOG_JSONPATH']) ####################### there's something wrong with this copy function, possibly incompatible data types
 
 staging_songs_copy = ("""
-COPY staging_songs FROM 's3://udacity-dend/song_data'
-CREDENTIALS 'aws_iam_role={}'
+COPY staging_songs FROM {}
+CREDENTIALS {}
 REGION 'us-west-2'
 FORMAT AS JSON 'auto';
 """).format(config['S3']['SONG_DATA'], config['IAM_ROLE']['ARN'])
@@ -129,28 +129,56 @@ FORMAT AS JSON 'auto';
 # FINAL TABLES
 
 songplay_table_insert = ("""
-    INSERT INTO songplay(songplay_id,start_time,user_id,level,song_id,artist_id,session_id,location,user_agent)
-    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) 
-""")
+    INSERT INTO songplay (songplay_id,start_time,user_id,level,song_id,artist_id,session_id,location,user_agent)
+    SELECT( se.ts as start_time,
+            se.userId as user_id,
+            se.level as level,
+            ss.song_id as song_id,
+            se.artist_id,
+            se.sessionId as session_id,
+            se.location as location,
+            se.userAgent as user_agent)
+    FROM staging_events se
+    JOIN staging_songs ss ON se.song = ss.title
+    WHERE se.page = 'NextPage'; 
+""") # do I need the (;)?
 
 user_table_insert = ("""
     INSERT INTO users(user_id,first_name,last_name,gender,level)
-    VALUES(%s,%s,%s,%s,%s)
+    SELECT( userId as user_id,
+            firstName as first_name,
+            lastName as last_name,
+            gender as gender,
+            level as level)
+    FROM staging_events 
+    GROUP BY userId;
 """)
 
 song_table_insert = ("""
     INSERT INTO songs(song_id,title,artist_id,year,duration)
-    VALUES(%s,%s,%s,%s,%s)
+    SELECT( song_id,
+            title,
+            artist_id,
+            year,
+            duration)
+    FROM staging_songs
+    GROUP BY song_id;
 """)
 
 artist_table_insert = ("""
     INSERT INTO artists(artist_id,name,location,latitude,longitude)
-    VALUES(%s,%s,%s,%s,%s)
+    SELECT( artist_id,
+            name,
+            location,
+            latitude,
+            longitude)
+    FROM staging_events
+    GROUP BY artist_id;
 """)
 
 time_table_insert = ("""
     INSERT INTO time(start_time,hour,day,week,month,year,weekday)
-    VALUES(%s,%s,%s,%s,%s,%s,%s)
+    SELECT 
 """)
 
 # QUERY LISTS
