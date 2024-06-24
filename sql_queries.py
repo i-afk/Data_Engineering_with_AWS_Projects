@@ -21,14 +21,14 @@ time_table_drop = "DROP TABLE IF EXISTS time"
 # Staging Tables:
 staging_events_table_create= ("""
     CREATE TABLE staging_events(
-        artist VARCHAR(100),
+        artist TEXT,
         auth VARCHAR(50),
         firstName VARCHAR(50),
         gender CHAR(1),
         itemInSession INT,
         lastName VARCHAR(50),
         length FLOAT,
-        level VARCHAR(50),
+        level VARCHAR(10),
         location TEXT,
         method VARCHAR(25),
         page VARCHAR(35),
@@ -36,7 +36,7 @@ staging_events_table_create= ("""
         sessionId INT,
         song TEXT,
         status INT,
-        ts INT,
+        ts BIGINT,
         userAgent TEXT,
         userId INT)
 """)
@@ -48,7 +48,7 @@ staging_songs_table_create = ("""
         artist_latitude FLOAT,
         artist_longitude FLOAT, 
         artist_location TEXT,
-        artist_name VARCHAR(100), 
+        artist_name TEXT, 
         song_id VARCHAR(20), 
         title TEXT, 
         duration FLOAT, 
@@ -67,22 +67,22 @@ songplay_table_create = ("""
         session_id INT,
         location TEXT,
         user_agent VARCHAR(20))
-""")
+""") 
 
 user_table_create = ("""
     CREATE TABLE users(
         user_id VARCHAR(30) PRIMARY KEY NOT NULL,
-        first_name VARCHAR(50),
-        last_name VARCHAR(50),
+        first_name TEXT,
+        last_name TEXT,
         gender CHAR(1),
-        level INT
+        level VARCHAR(10)
     )
 """)
 
 song_table_create = ("""
     CREATE TABLE songs(
         song_id VARCHAR(30) PRIMARY KEY NOT NULL,
-        title VARCHAR(100),
+        title TEXT,
         artist_id VARCHAR(30),
         year INT,
         duration FLOAT)
@@ -91,7 +91,7 @@ song_table_create = ("""
 artist_table_create = ("""
     CREATE TABLE artists(
         artist_id VARCHAR(30) PRIMARY KEY NOT NULL,
-        name VARCHAR(50),
+        name TEXT,
         location TEXT,
         latitude FLOAT,
         longitude FLOAT)
@@ -99,7 +99,7 @@ artist_table_create = ("""
 
 time_table_create = ("""
     CREATE TABLE time(
-        start_time TIMESTAMP PRIMARY KEY NOT NULL,
+        start_time TIMESTAMP PRIMARY KEY NOT NULL, 
         hour INT,
         day INT,
         week INT, 
@@ -107,7 +107,7 @@ time_table_create = ("""
         year INT,
         weekday CHAR(1)
     )
-""")
+""")  
 
 
 # STAGING TABLES
@@ -117,7 +117,7 @@ COPY staging_events FROM {}
 CREDENTIALS {}
 REGION 'us-west-2'
 FORMAT AS JSON {};
-""".format(config['S3']['LOG_DATA'], config['IAM_ROLE']['ARN'], config['S3']['LOG_JSONPATH']) ####################### there's something wrong with this copy function, possibly incompatible data types
+""".format(config['S3']['LOG_DATA'], config['IAM_ROLE']['ARN'], config['S3']['LOG_JSONPATH'])
 
 staging_songs_copy = ("""
 COPY staging_songs FROM {}
@@ -129,57 +129,72 @@ FORMAT AS JSON 'auto';
 # FINAL TABLES
 
 songplay_table_insert = ("""
-    INSERT INTO songplay (songplay_id,start_time,user_id,level,song_id,artist_id,session_id,location,user_agent)
-    SELECT( se.ts as start_time,
+    INSERT INTO songplays (start_time,user_id,level,song_id,artist_id,session_id,location,user_agent)
+    SELECT  se.ts as start_time,
             se.userId as user_id,
             se.level as level,
             ss.song_id as song_id,
-            se.artist_id,
+            ss.artist_id,
             se.sessionId as session_id,
             se.location as location,
-            se.userAgent as user_agent)
+            se.userAgent as user_agent
     FROM staging_events se
     JOIN staging_songs ss ON se.song = ss.title
     WHERE se.page = 'NextPage'; 
-""") # do I need the (;)?
+""") 
 
 user_table_insert = ("""
     INSERT INTO users(user_id,first_name,last_name,gender,level)
-    SELECT( userId as user_id,
+    SELECT DISTINCT
+            userId as user_id,
             firstName as first_name,
             lastName as last_name,
             gender as gender,
-            level as level)
-    FROM staging_events 
-    GROUP BY userId;
+            level as level
+    FROM staging_events
+    WHERE userID IS NOT NULL;
 """)
 
 song_table_insert = ("""
     INSERT INTO songs(song_id,title,artist_id,year,duration)
-    SELECT( song_id,
+    SELECT DISTINCT
+            song_id,
             title,
             artist_id,
             year,
-            duration)
+            duration
     FROM staging_songs
-    GROUP BY song_id;
+    WHERE song_id IS NOT NULL;
 """)
 
 artist_table_insert = ("""
     INSERT INTO artists(artist_id,name,location,latitude,longitude)
-    SELECT( artist_id,
-            name,
-            location,
-            latitude,
-            longitude)
-    FROM staging_events
-    GROUP BY artist_id;
+    SELECT DISTINCT
+            artist_id,
+            artist_name as name,
+            artist_location as location,
+            artist_latitude as latitude,
+            artist_longitude as longitude
+    FROM staging_songs
+    WHERE artist_id IS NOT NULL;
 """)
 
 time_table_insert = ("""
-    INSERT INTO time(start_time,hour,day,week,month,year,weekday)
-    SELECT 
-""")
+    INSERT INTO time(start_time, hour, day, week, month, year, weekday)
+    SELECT
+        DATEADD(SECOND, ts, '1970-01-01 00:00:00') AS start_time,
+        DATEPART(HOUR, DATEADD(SECOND, ts, '1970-01-01 00:00:00')) AS hour,
+        DATEPART(DAY, DATEADD(SECOND, ts, '1970-01-01 00:00:00')) AS day,
+        DATEPART(WEEK, DATEADD(SECOND, ts, '1970-01-01 00:00:00')) AS week,
+        DATEPART(MONTH, DATEADD(SECOND, ts, '1970-01-01 00:00:00')) AS month,
+        DATEPART(YEAR, DATEADD(SECOND, ts, '1970-01-01 00:00:00')) AS year,
+        CASE 
+            WHEN DATEPART(WEEKDAY, DATEADD(SECOND, ts, '1970-01-01 00:00:00')) IN (1, 7) THEN 'N' 
+            ELSE 'Y' 
+        END AS weekday
+    FROM staging_events
+    WHERE ts IS NOT NULL;
+""") 
 
 # QUERY LISTS
 
