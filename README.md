@@ -1,4 +1,4 @@
-# Sparkify EtL Pipeline
+# Sparkify ETL Pipeline
 #### Ian McDonough
 
 
