@@ -15,9 +15,13 @@ This zipped folder contains four additional files necessary to run the pipeline:
 
 
 To execute this pipeline you must:
-1) Insert your personal AWS data, from an active cluster, into the dwh.cfg file and save it in the same file which contains the other files listed above
+1) Insert your personal AWS data, from an active cluster in the us-west-2 region, into the dwh.cfg file and save it in the same file which contains the other files listed above
 2) From a terminal first execute the 'sql_queries.py' file
 3) Then execute the 'create_tables.py' file
 4) Lastly execute the 'etl.py' file
 5) Allow for several minutes for the data transfer to complete
 6) Confirm the completion of the ETL pipeline from your AWS account
+
+# Attributions
+Udacity Mentor Survesh: https://knowledge.udacity.com/questions/1041967
+

@@ -66,7 +66,7 @@ songplay_table_create = ("""
         artist_id VARCHAR(20),
         session_id INT,
         location TEXT,
-        user_agent VARCHAR(20))
+        user_agent TEXT)
 """) 
 
 user_table_create = ("""
@@ -140,7 +140,7 @@ songplay_table_insert = ("""
             se.userAgent as user_agent
     FROM staging_events se
     JOIN staging_songs ss ON se.song = ss.title
-    WHERE se.page = 'NextPage'; 
+    WHERE se.page = 'NextSong'; 
 """) 
 
 user_table_insert = ("""
@@ -152,7 +152,8 @@ user_table_insert = ("""
             gender as gender,
             level as level
     FROM staging_events
-    WHERE userID IS NOT NULL;
+    WHERE userID IS NOT NULL
+    AND page = 'NextSong';
 """)
 
 song_table_insert = ("""
@@ -193,7 +194,8 @@ time_table_insert = ("""
             ELSE 'Y' 
         END AS weekday
     FROM staging_events
-    WHERE ts IS NOT NULL;
+    WHERE ts IS NOT NULL
+    AND page = 'NextSong';
 """) 
 
 # QUERY LISTS
